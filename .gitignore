@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.venv/
+venv/
+venv_*/
+env/
+
+# Local tooling / caches
+.matplotlib/
+.kiro/
+.cursor/
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+*.local
+
+# OS
+.DS_Store
+
+# Secrets and local notes (do not publish)
+notes_talks.txt
+
+# Large archives (optional local artifacts)
+*.tar.bz2

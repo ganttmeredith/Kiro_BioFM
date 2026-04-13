@@ -1,0 +1,19 @@
+fastapi
+uvicorn[standard]
+pydantic>=2.0
+pandas
+numpy
+plotly
+s3fs
+joblib
+python-multipart
+boto3
+strands-agents
+bedrock-agentcore
+# umap_retrieval dependencies
+scikit-learn
+scipy
+umap-learn
+h5py
+# torch is intentionally excluded — only needed for optional ABMIL re-embedding
+# (h5_service.py). Install separately if that feature is required.
