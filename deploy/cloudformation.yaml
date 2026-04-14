@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Clinical PAL — Precision oncology AI platform for biomarker discovery
+  and clinical trial patient screening. Deploys backend (FastAPI) and
+  frontend (React) on AWS App Runner with ECR image sources.
+
+Parameters:
+  BackendImageUri:
+    Type: String
+    Description: ECR URI for the backend Docker image
+  FrontendImageUri:
+    Type: String
+    Description: ECR URI for the frontend Docker image
+  AwsRegion:
+    Type: String
+    Default: us-west-2
+
+Resources:
+  # ── IAM Role for App Runner to pull from ECR ──────────────────────────────
+  AppRunnerECRAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ClinicalPAL-AppRunnerECRAccess
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+
+  # ── IAM Role for backend instance (Bedrock access) ────────────────────────
+  BackendInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ClinicalPAL-BackendInstance
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockInvokeAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:Converse
+                Resource: "*"
+
+  # ── Backend App Runner Service ────────────────────────────────────────────
+  BackendService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: clinical-pal-backend
+      SourceConfiguration:
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt AppRunnerECRAccessRole.Arn
+        ImageRepository:
+          ImageIdentifier: !Ref BackendImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "8080"
+            RuntimeEnvironmentVariables:
+              - Name: AWS_DEFAULT_REGION
+                Value: !Ref AwsRegion
+      InstanceConfiguration:
+        Cpu: "2 vCPU"
+        Memory: "4 GB"
+        InstanceRoleArn: !GetAtt BackendInstanceRole.Arn
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /api/status
+
+  # ── Frontend App Runner Service ───────────────────────────────────────────
+  FrontendService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: clinical-pal-frontend
+      SourceConfiguration:
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt AppRunnerECRAccessRole.Arn
+        ImageRepository:
+          ImageIdentifier: !Ref FrontendImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "80"
+            RuntimeEnvironmentVariables:
+              - Name: BACKEND_HOST
+                Value: !GetAtt BackendService.ServiceUrl
+      InstanceConfiguration:
+        Cpu: "1 vCPU"
+        Memory: "2 GB"
+
+Outputs:
+  BackendUrl:
+    Description: Backend API URL
+    Value: !Sub "https://${BackendService.ServiceUrl}"
+  FrontendUrl:
+    Description: Frontend application URL
+    Value: !Sub "https://${FrontendService.ServiceUrl}"

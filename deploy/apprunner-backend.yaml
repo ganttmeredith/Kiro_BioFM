@@ -1,0 +1,29 @@
+# AWS App Runner service configuration for the FastAPI backend.
+# Deploy via: aws apprunner create-service --cli-input-yaml file://deploy/apprunner-backend.yaml
+#
+# Prerequisites:
+#   1. Push Docker image to ECR (see deploy/push-to-ecr.sh)
+#   2. Create an App Runner access role with ECR pull permissions
+#   3. Set the ImageIdentifier to your ECR URI
+
+ServiceName: clinical-pal-backend
+SourceConfiguration:
+  AuthenticationConfiguration:
+    AccessRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/AppRunnerECRAccessRole"
+  ImageRepository:
+    ImageIdentifier: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/clinical-pal-backend:latest"
+    ImageRepositoryType: ECR
+    ImageConfiguration:
+      Port: "8080"
+      RuntimeEnvironmentVariables:
+        AWS_DEFAULT_REGION: "us-west-2"
+InstanceConfiguration:
+  Cpu: "2 vCPU"
+  Memory: "4 GB"
+HealthCheckConfiguration:
+  Protocol: HTTP
+  Path: /api/status
+  Interval: 10
+  Timeout: 5
+  HealthyThreshold: 1
+  UnhealthyThreshold: 5

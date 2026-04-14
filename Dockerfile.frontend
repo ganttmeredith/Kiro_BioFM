@@ -1,0 +1,21 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS build
+
+WORKDIR /app
+COPY agentic_morphological_patient_matching/frontend/package*.json ./
+RUN npm ci
+COPY agentic_morphological_patient_matching/frontend/ ./
+RUN npm run build
+
+# ── Serve stage ───────────────────────────────────────────────────────────────
+FROM nginx:alpine
+
+COPY agentic_morphological_patient_matching/frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# BACKEND_HOST is injected by ECS task definition or docker-compose
+ENV BACKEND_HOST=backend
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

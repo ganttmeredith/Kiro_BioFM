@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps for scipy, scikit-learn, h5py
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libhdf5-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY agentic_morphological_patient_matching/backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir statsmodels mcp
+
+# Copy application code
+COPY common/ /app/common/
+COPY agentic_morphological_patient_matching/backend/ /app/backend/
+COPY agentic_morphological_patient_matching/backend/umap_retrieval_pkg/ /app/umap_retrieval_pkg/
+
+# Copy data files
+COPY data/ /app/data/
+COPY clinical_data.json blood_data.json blood_data_reference_ranges.json /app/
+
+ENV PYTHONPATH=/app:/app/common:/app/umap_retrieval_pkg
+ENV DEFAULT_CSV=/app/data/enriched_slide_embeddings.csv
+ENV PROFILES_DIR=/app/data/profiles
+ENV AWS_DEFAULT_REGION=us-west-2
+
+EXPOSE 8080
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
