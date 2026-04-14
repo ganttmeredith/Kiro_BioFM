@@ -1,19 +1,15 @@
-# Clinical PAL — Precision AI for Life Sciences
+# First Non-responders — Understanding non-responsive patient outcomes in clinical data
 
 > **AWS Life Sciences Symposium Hackathon Submission**
 > Biomarker discovery and clinical trial patient screening using BioFMs, AI agents, and real-world head & neck cancer data.
 
 ---
 
-## Problem Statement
+## What did we build? And why?
 
-**20% of clinical trials fail due to poor enrollment.** Traditional manual screening takes 2–3 weeks per subject at $22,000 each, with only 14% of screened oncology subjects qualifying for Phase 2 trials. For head and neck cancer Phase 2 trials targeting 20–80 subjects, screening costs can reach $440K–$1.76M.
-
-Clinical PAL demonstrates how AI can reduce screening time by 50–85%, cut costs by 50%, and improve screening-to-enrolled ratios from 10:1 to 5:1.
+Clinical trial analysis is lengthy and cumbersome. Multimodal datasets require labeling, cleaning, concatenization, normalization, and that's before any data analysis has been performed. A plethora of possible statistical tools are available to clinicians, but they are often gatekept behind requisite knowledge. First Non-responders aims to alleviate long-term monitoring of clinical trial data, specifically for clinicians with little-to-no code experience. Here, we developed a front-end Vite application which allows the physician to query the head and neck cancer dataset (but this workflow can be adapated to any public or private data repository). Patient biomarkers are analyzed systematically, creating a database of empirical information the physician can query via our RAG-based workflow. AWS Kiro was used to develop an integrated AWS Tech Stack. Spec-driven development allowed the development and deployment of this application in 3 hours. 
 
 ## Solution Overview
-
-Clinical PAL is a full-stack precision oncology platform that combines:
 
 1. **Morphological Patient Matching** — ABMIL (Attention-Based Multiple Instance Learning) slide-level embeddings from H&E-stained whole-slide images, enabling tissue morphology-based patient similarity search
 2. **Outcome-Based Biomarker Discovery** — Statistical analysis (Mann-Whitney U, Cohen's d, Benjamini-Hochberg FDR correction) comparing Non-Responder vs Responder cohorts across 38+ blood analytes
