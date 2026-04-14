@@ -50,6 +50,8 @@ Thumbs.db
 data/h5_cache/
 data/profiles/*.joblib
 data/profiles/*.npz
+data/slide_embeddings.csv
+data/enriched_slide_embeddings.csv
 *.tar.bz2
 demo.tar.bz2
 
