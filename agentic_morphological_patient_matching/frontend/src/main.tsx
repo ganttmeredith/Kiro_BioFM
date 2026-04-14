@@ -5,6 +5,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import '@cloudscape-design/global-styles/index.css'
 
+// Apply Cloudscape dark mode
+import { applyMode, Mode } from '@cloudscape-design/global-styles'
+applyMode(Mode.Dark)
+
 const queryClient = new QueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

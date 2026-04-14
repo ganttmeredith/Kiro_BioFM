@@ -1,22 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import AppLayout from '@cloudscape-design/components/app-layout'
-import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation'
 import Flashbar, { FlashbarProps } from '@cloudscape-design/components/flashbar'
-import Alert from '@cloudscape-design/components/alert'
-import SpaceBetween from '@cloudscape-design/components/space-between'
 import Spinner from '@cloudscape-design/components/spinner'
 import Box from '@cloudscape-design/components/box'
 import { fetchStatus, fetchSummary } from './api/client'
-import type { MetadataFilters, DataSummary, UMAPResponse, RetrievalResponse, AppContext } from './types'
+import type { MetadataFilters, DataSummary } from './types'
 import DataPanel from './panels/DataPanel'
 import RetrievalPanel from './panels/RetrievalPanel'
 import UMAPPanel from './panels/UMAPPanel'
 import ClusterPanel from './panels/ClusterPanel'
 import ChatPanel from './panels/ChatPanel'
 import BiomarkerPanel from './panels/BiomarkerPanel'
-import FilterPanel from './components/FilterPanel'
+import ImmersiveShell from './components/ImmersiveShell'
+import './immersive.css'
 
 const loadingFallback = (
   <Box textAlign="center" padding="xl">
@@ -24,7 +21,7 @@ const loadingFallback = (
   </Box>
 )
 
-// ─── Filter URL serialisation ─────────────────────────────────────────────────
+// ─── Filter helpers ───────────────────────────────────────────────────────────
 
 function filtersToParam(filters: MetadataFilters): string {
   if (Object.keys(filters).length === 0) return ''
@@ -40,19 +37,6 @@ function paramToFilters(param: string | null): MetadataFilters {
   }
 }
 
-// ─── Nav helpers ──────────────────────────────────────────────────────────────
-
-const NAV_ITEMS = [
-  { text: 'Data', href: '/data' },
-  { text: 'Explore', href: '/explore' },
-  { text: 'Morphology Groups', href: '/cluster' },
-  { text: 'Patient Matcher', href: '/retrieve' },
-  { text: 'Chat', href: '/chat' },
-  { text: 'Biomarker Discovery', href: '/biomarkers' },
-]
-
-const DATA_ONLY_PATHS = new Set(['/explore', '/cluster', '/retrieve', '/chat', '/biomarkers'])
-
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App(): React.ReactElement {
@@ -60,7 +44,6 @@ export default function App(): React.ReactElement {
   const location = useLocation()
   const queryClient = useQueryClient()
 
-  // Restore filters from URL on load
   const searchParams = new URLSearchParams(location.search)
   const [filters, setFilters] = useState<MetadataFilters>(() =>
     paramToFilters(searchParams.get('filters')),
@@ -71,19 +54,15 @@ export default function App(): React.ReactElement {
   const [queryPatientId, setQueryPatientId] = useState<string>('')
   const [highlightIds, setHighlightIds] = useState<string[]>([])
   const [queryHighlightId, setQueryHighlightId] = useState<string | undefined>(undefined)
-  // Slide-level highlight names for UMAP overlay (set by "Show on UMAP")
   const [highlightSlideName, setHighlightSlideName] = useState<string | undefined>(undefined)
   const [neighbourSlideNames, setNeighbourSlideNames] = useState<string[]>([])
   const [highlightVersion, setHighlightVersion] = useState(0)
+  const [activeSection, setActiveSection] = useState('hero')
 
-  // Lifted panel state — survives tab navigation
   const [umapResult, setUmapResult] = useState<import('./types').UMAPResponse | null>(null)
   const [retrievalResult, setRetrievalResult] = useState<import('./types').RetrievalResponse | null>(null)
   const [clusterResult, setClusterResult] = useState<import('./types').ClusterResponse | null>(null)
   const [weights, setWeights] = useState({ alpha: 0.4, beta: 0.4, gamma: 0.2 })
-
-  // Error state for "too restrictive" filters (HTTP 400)
-  const [filtersRestrictive, setFiltersRestrictive] = useState(false)
 
   // ── GET /api/status on mount ──────────────────────────────────────────────
   const {
@@ -97,21 +76,17 @@ export default function App(): React.ReactElement {
     retry: false,
   })
 
-  // Auto-fetch DataSummary when backend already has data loaded (e.g. after page refresh)
   useEffect(() => {
     if (status?.loaded && dataSummary === null) {
       fetchSummary()
         .then((summary) => setDataSummary(summary))
-        .catch(() => {/* non-fatal — user can reload manually */})
+        .catch(() => {/* non-fatal */})
     }
   }, [status?.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dataLoaded = dataSummary !== null || status?.loaded === true
-
-  // Don't redirect while status is still loading — wait for the result
   const statusResolved = !statusLoading
 
-  // Show error flash if status call fails
   useEffect(() => {
     if (statusError) {
       setFlashItems((prev) => [
@@ -128,7 +103,6 @@ export default function App(): React.ReactElement {
     }
   }, [statusError, statusErrorObj])
 
-  // Show success flash when data becomes loaded
   useEffect(() => {
     if (dataLoaded) {
       setFlashItems((prev) => [
@@ -147,42 +121,17 @@ export default function App(): React.ReactElement {
     }
   }, [dataLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Filter persistence ────────────────────────────────────────────────────
-  const handleFiltersChange = useCallback(
-    (newFilters: MetadataFilters) => {
-      setFilters(newFilters)
-      // Clear "too restrictive" warning when filters change
-      setFiltersRestrictive(false)
-      setFlashItems((prev) => prev.filter((f) => f.id !== 'filters-restrictive'))
-      const params = new URLSearchParams(location.search)
-      const serialised = filtersToParam(newFilters)
-      if (serialised) {
-        params.set('filters', serialised)
-      } else {
-        params.delete('filters')
-      }
-      navigate({ search: params.toString() }, { replace: true })
-    },
-    [location.search, navigate],
-  )
+  // Filter changes are handled directly by panels in scroll mode
 
-  // ── Data loaded callback (from DataPanel) ─────────────────────────────────
   const handleDataLoaded = useCallback((summary: DataSummary) => {
     setDataSummary(summary)
-    // Invalidate status cache so dataLoaded reflects the new state immediately
     void queryClient.invalidateQueries({ queryKey: ['status'] })
   }, [queryClient])
 
-  // ── UMAP click → set query patient and navigate to Retrieve ──────────────
-  const handleQuerySelect = useCallback(
-    (patientId: string) => {
-      setQueryPatientId(patientId)
-      navigate('/retrieve')
-    },
-    [navigate],
-  )
+  const handleQuerySelect = useCallback((patientId: string) => {
+    setQueryPatientId(patientId)
+  }, [])
 
-  // ── "Show on UMAP" from RetrievalPanel ────────────────────────────────────
   const handleShowOnUMAP = useCallback(
     (queryId: string, matchIds: string[], querySlideName?: string, neighbourSlides?: string[]) => {
       setQueryHighlightId(queryId)
@@ -190,12 +139,10 @@ export default function App(): React.ReactElement {
       setHighlightSlideName(querySlideName)
       setNeighbourSlideNames(neighbourSlides ?? [])
       setHighlightVersion(v => v + 1)
-      navigate('/explore')
     },
-    [navigate],
+    [],
   )
 
-  // ── HTTP 409 "not loaded" handler — used by panels ────────────────────────
   const handleNotLoadedError = useCallback(() => {
     setFlashItems((prev) => [
       ...prev.filter((f) => f.id !== 'not-loaded'),
@@ -204,29 +151,13 @@ export default function App(): React.ReactElement {
         type: 'warning',
         dismissible: true,
         header: 'Dataset not loaded',
-        content: 'Please load a dataset on the Data tab before running this operation.',
-        action: (
-          <Box>
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                navigate('/data')
-              }}
-              style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              Go to Data tab
-            </a>
-          </Box>
-        ),
+        content: 'Please load a dataset in the Data section first.',
         onDismiss: () => setFlashItems((prev) => prev.filter((f) => f.id !== 'not-loaded')),
       },
     ])
-  }, [navigate])
+  }, [])
 
-  // ── HTTP 400 "too restrictive" handler — used by panels ───────────────────
   const handleFiltersRestrictive = useCallback(() => {
-    setFiltersRestrictive(true)
     setFlashItems((prev) => [
       ...prev.filter((f) => f.id !== 'filters-restrictive'),
       {
@@ -234,215 +165,121 @@ export default function App(): React.ReactElement {
         type: 'warning',
         dismissible: true,
         header: 'Filters too restrictive',
-        content:
-          'The active filters match fewer than 2 slides. Try relaxing your filter selections in the Filter panel.',
-        onDismiss: () => {
-          setFlashItems((prev) => prev.filter((f) => f.id !== 'filters-restrictive'))
-          setFiltersRestrictive(false)
-        },
+        content: 'Fewer than 2 slides match. Relax your filter selections.',
+        onDismiss: () => setFlashItems((prev) => prev.filter((f) => f.id !== 'filters-restrictive')),
       },
     ])
   }, [])
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-  const activeHref = '/' + (location.pathname.split('/')[1] || 'data')
+  const filterableColumns = dataSummary?.filterableColumns ?? []
 
-  const navItems: SideNavigationProps.Item[] = NAV_ITEMS.map((item) => ({
-    type: 'link' as const,
-    text: item.text,
-    href: item.href,
-  }))
-
-  function handleNavFollow(
-    event: CustomEvent<SideNavigationProps.FollowDetail>,
-  ): void {
-    event.preventDefault()
-    const href = event.detail.href
-    if (!dataLoaded && DATA_ONLY_PATHS.has(href)) {
-      setFlashItems((prev) => [
-        ...prev.filter((f) => f.id !== 'nav-blocked'),
-        {
-          id: 'nav-blocked',
-          type: 'info',
-          dismissible: true,
-          header: 'Load data first',
-          content: 'Please load a dataset on the Data tab before navigating here.',
-          onDismiss: () => setFlashItems((prev) => prev.filter((f) => f.id !== 'nav-blocked')),
-        },
-      ])
-      return
-    }
-    navigate(href)
-  }
-
-  // ── Loading flash while status is being fetched ───────────────────────────
   const notifications: FlashbarProps.MessageDefinition[] = [
     ...(statusLoading
-      ? [
-          {
-            id: 'status-loading',
-            type: 'in-progress' as const,
-            loading: true,
-            content: 'Checking backend status…',
-          },
-        ]
+      ? [{ id: 'status-loading', type: 'in-progress' as const, loading: true, content: 'Checking backend…' }]
       : []),
     ...flashItems,
   ]
 
-  // ── FilterPanel sidebar (shown on Explore / Cluster / Retrieve) ───────────
-  const filterableColumns = dataSummary?.filterableColumns ?? []
-  const showFilterSidebar =
-    filterableColumns.length > 0 &&
-    (activeHref === '/explore' || activeHref === '/cluster' || activeHref === '/retrieve')
+  // ── Build panel elements for each scroll section ──────────────────────────
+  const panelElements = [
+    // 1. Data
+    <DataPanel key="data" onDataLoaded={handleDataLoaded} initialPath={status?.csvPath} summary={dataSummary} />,
 
-  const filterSidebar = showFilterSidebar ? (
-    <SpaceBetween size="m">
-      {filtersRestrictive && (
-        <Alert
-          type="warning"
-          header="Filters too restrictive"
-          dismissible
-          onDismiss={() => {
-            setFiltersRestrictive(false)
-            setFlashItems((prev) => prev.filter((f) => f.id !== 'filters-restrictive'))
-          }}
-        >
-          Fewer than 2 slides match the current filters. Relax your selections to proceed.
-        </Alert>
-      )}
-      <FilterPanel
+    // 2. Explore (UMAP)
+    !statusResolved && !dataSummary ? loadingFallback : dataLoaded ? (
+      <UMAPPanel
+        key="explore"
+        filters={filters}
+        onQuerySelect={handleQuerySelect}
+        highlightIds={highlightIds}
+        queryHighlightId={queryHighlightId}
+        highlightSlideName={highlightSlideName}
+        neighbourSlideNames={neighbourSlideNames}
+        highlightVersion={highlightVersion}
         columns={filterableColumns}
-        activeFilters={filters}
-        onChange={handleFiltersChange}
+        onNotLoadedError={handleNotLoadedError}
+        onFiltersRestrictive={handleFiltersRestrictive}
+        umapResult={umapResult}
+        onUmapResult={setUmapResult}
       />
-    </SpaceBetween>
-  ) : undefined
+    ) : <Box key="explore" textAlign="center" color="text-status-inactive" padding="xl">Load data above first.</Box>,
 
-  // ── Content routing ───────────────────────────────────────────────────────
-  const content = (
-    <Routes>
-      <Route path="/data" element={<DataPanel onDataLoaded={handleDataLoaded} initialPath={status?.csvPath} summary={dataSummary} />} />
-      <Route
-        path="/explore"
-        element={
-          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
-            <UMAPPanel
-              filters={filters}
-              onQuerySelect={handleQuerySelect}
-              highlightIds={highlightIds}
-              queryHighlightId={queryHighlightId}
-              highlightSlideName={highlightSlideName}
-              neighbourSlideNames={neighbourSlideNames}
-              highlightVersion={highlightVersion}
-              columns={filterableColumns}
-              onNotLoadedError={handleNotLoadedError}
-              onFiltersRestrictive={handleFiltersRestrictive}
-              umapResult={umapResult}
-              onUmapResult={setUmapResult}
-            />
-          ) : (
-            <Navigate to="/data" replace />
-          )
-        }
+    // 3. Morphology Groups (Cluster)
+    !statusResolved && !dataSummary ? loadingFallback : dataLoaded ? (
+      <ClusterPanel
+        key="cluster"
+        filters={filters}
+        onNotLoadedError={handleNotLoadedError}
+        onFiltersRestrictive={handleFiltersRestrictive}
+        onClusterResult={setClusterResult}
       />
-      <Route
-        path="/cluster"
-        element={
-          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
-            <ClusterPanel
-              filters={filters}
-              onNotLoadedError={handleNotLoadedError}
-              onFiltersRestrictive={handleFiltersRestrictive}
-              onClusterResult={setClusterResult}
-            />
-          ) : (
-            <Navigate to="/data" replace />
-          )
-        }
+    ) : <Box key="cluster" textAlign="center" color="text-status-inactive" padding="xl">Load data above first.</Box>,
+
+    // 4. Patient Matcher (Retrieval)
+    !statusResolved && !dataSummary ? loadingFallback : dataLoaded ? (
+      <RetrievalPanel
+        key="retrieve"
+        filters={filters}
+        initialPatientId={queryPatientId}
+        onShowOnUMAP={handleShowOnUMAP}
+        onNotLoadedError={handleNotLoadedError}
+        onFiltersRestrictive={handleFiltersRestrictive}
+        result={retrievalResult}
+        onResult={setRetrievalResult}
+        weights={weights}
+        onWeightsChange={setWeights}
+        nullP95={dataSummary?.nullDistribution?.percentile95}
       />
-      <Route
-        path="/retrieve"
-        element={
-          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
-            <RetrievalPanel
-              filters={filters}
-              initialPatientId={queryPatientId}
-              onShowOnUMAP={handleShowOnUMAP}
-              onNotLoadedError={handleNotLoadedError}
-              onFiltersRestrictive={handleFiltersRestrictive}
-              result={retrievalResult}
-              onResult={setRetrievalResult}
-              weights={weights}
-              onWeightsChange={setWeights}
-              nullP95={dataSummary?.nullDistribution?.percentile95}
-            />
-          ) : (
-            <Navigate to="/data" replace />
-          )
-        }
+    ) : <Box key="retrieve" textAlign="center" color="text-status-inactive" padding="xl">Load data above first.</Box>,
+
+    // 5. Chat
+    !statusResolved && !dataSummary ? loadingFallback : dataLoaded ? (
+      <ChatPanel
+        key="chat"
+        appContext={{
+          nSlides: dataSummary?.nSlides ?? status?.nSlides,
+          nPatients: dataSummary?.nPatients ?? status?.nPatients,
+          activeFilters: filters,
+          queryPatientId: queryPatientId || undefined,
+          retrievalResults: retrievalResult?.matches,
+          alpha: weights.alpha,
+          beta: weights.beta,
+          gamma: weights.gamma,
+          umapNPoints: umapResult?.nPoints,
+          umapNClusters: umapResult?.nClusters,
+          bestK: clusterResult?.bestK,
+        }}
+        onRetrievalResult={(result) => {
+          setRetrievalResult(result)
+          setQueryPatientId(result.queryPatient.patientId)
+        }}
       />
-      <Route
-        path="/chat"
-        element={
-          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
-            <ChatPanel
-              appContext={{
-                nSlides: dataSummary?.nSlides ?? status?.nSlides,
-                nPatients: dataSummary?.nPatients ?? status?.nPatients,
-                activeFilters: filters,
-                queryPatientId: queryPatientId || undefined,
-                retrievalResults: retrievalResult?.matches,
-                alpha: weights.alpha,
-                beta: weights.beta,
-                gamma: weights.gamma,
-                umapNPoints: umapResult?.nPoints,
-                umapNClusters: umapResult?.nClusters,
-                bestK: clusterResult?.bestK,
-              }}
-              onRetrievalResult={(result) => {
-                setRetrievalResult(result)
-                setQueryPatientId(result.queryPatient.patientId)
-              }}
-            />
-          ) : (
-            <Navigate to="/data" replace />
-          )
-        }
-      />
-      <Route
-        path="/biomarkers"
-        element={
-          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
-            <BiomarkerPanel onNotLoadedError={handleNotLoadedError} />
-          ) : (
-            <Navigate to="/data" replace />
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to="/data" replace />} />
-    </Routes>
-  )
+    ) : <Box key="chat" textAlign="center" color="text-status-inactive" padding="xl">Load data above first.</Box>,
+
+    // 6. Biomarker Discovery
+    !statusResolved && !dataSummary ? loadingFallback : dataLoaded ? (
+      <BiomarkerPanel key="biomarkers" onNotLoadedError={handleNotLoadedError} />
+    ) : <Box key="biomarkers" textAlign="center" color="text-status-inactive" padding="xl">Load data above first.</Box>,
+  ]
 
   return (
-    <AppLayout
-      navigation={
-        <SideNavigation
-          header={{ text: 'Patient Similarity', href: '/data' }}
-          activeHref={activeHref}
-          items={navItems}
-          onFollow={handleNavFollow}
-        />
-      }
-      notifications={<Flashbar items={notifications} stackItems />}
-      content={content}
-      tools={filterSidebar}
-      toolsHide={!showFilterSidebar}
-      navigationWidth={220}
-    />
+    <>
+      {/* Floating notifications */}
+      {notifications.length > 0 && (
+        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, maxWidth: 600, width: '90%' }}>
+          <Flashbar items={notifications} stackItems />
+        </div>
+      )}
+
+      <ImmersiveShell
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+      >
+        {panelElements}
+      </ImmersiveShell>
+    </>
   )
 }
 
-// Export filter helpers for use in child panels
 export { filtersToParam, paramToFilters }
 export type { MetadataFilters }

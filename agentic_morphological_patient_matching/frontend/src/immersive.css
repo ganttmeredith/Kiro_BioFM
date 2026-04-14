@@ -1,0 +1,335 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Clinical PAL — Immersive Matrix / DNA Theme
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --matrix-green: #00ff41;
+  --matrix-green-dim: #00cc33;
+  --matrix-dark: #000a0f;
+  --matrix-panel: rgba(0, 20, 15, 0.85);
+  --matrix-border: rgba(0, 255, 65, 0.15);
+  --matrix-glow: 0 0 20px rgba(0, 255, 65, 0.3);
+  --matrix-text: #c0ffc0;
+  --matrix-text-dim: #608060;
+  --section-max-width: 1400px;
+}
+
+/* ── Global overrides ──────────────────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--matrix-dark);
+  color: var(--matrix-text);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  overflow: hidden;
+}
+
+/* ── Matrix rain overlay ───────────────────────────────────────────────────── */
+
+.matrix-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 65, 0.015) 2px,
+    rgba(0, 255, 65, 0.015) 4px
+  );
+}
+
+/* ── Scroll container ──────────────────────────────────────────────────────── */
+
+.immersive-scroll-container {
+  position: relative;
+  z-index: 2;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--matrix-green-dim) transparent;
+}
+
+.immersive-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.immersive-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.immersive-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--matrix-green-dim);
+  border-radius: 3px;
+}
+
+/* ── Hero section ──────────────────────────────────────────────────────────── */
+
+.immersive-hero {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: start;
+  position: relative;
+}
+
+.hero-content {
+  text-align: center;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  z-index: 3;
+}
+
+.hero-badge {
+  display: inline-block;
+  padding: 6px 18px;
+  border: 1px solid var(--matrix-border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--matrix-green-dim);
+  margin-bottom: 24px;
+  backdrop-filter: blur(10px);
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.hero-title {
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 200;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  color: #fff;
+  line-height: 1;
+}
+
+.hero-glow {
+  color: var(--matrix-green);
+  text-shadow: 0 0 40px rgba(0, 255, 65, 0.5), 0 0 80px rgba(0, 255, 65, 0.2);
+}
+
+.hero-subtitle {
+  font-size: 1.3rem;
+  font-weight: 300;
+  color: var(--matrix-text-dim);
+  margin: 0 0 8px;
+  letter-spacing: 0.1em;
+}
+
+.hero-description {
+  font-size: 0.9rem;
+  color: var(--matrix-text-dim);
+  line-height: 1.6;
+  margin: 0 0 40px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 32px;
+  background: transparent;
+  border: 1px solid var(--matrix-green);
+  color: var(--matrix-green);
+  font-family: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.hero-cta:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: var(--matrix-glow);
+  transform: translateY(-2px);
+}
+
+.hero-cta svg {
+  animation: bounce-down 2s infinite;
+}
+
+@keyframes bounce-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(5px); }
+}
+
+/* ── Floating nav ──────────────────────────────────────────────────────────── */
+
+.immersive-nav {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-dot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  flex-direction: row-reverse;
+}
+
+.nav-dot-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--matrix-panel);
+  border: 1px solid var(--matrix-border);
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+}
+
+.nav-dot.active .nav-dot-icon {
+  border-color: var(--matrix-green);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.4);
+  background: rgba(0, 255, 65, 0.15);
+}
+
+.nav-dot-label {
+  font-size: 0.7rem;
+  color: transparent;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+  font-family: inherit;
+}
+
+.nav-dot:hover .nav-dot-label,
+.nav-dot.active .nav-dot-label {
+  color: var(--matrix-green);
+}
+
+/* ── Panel sections ────────────────────────────────────────────────────────── */
+
+.immersive-section {
+  min-height: 100vh;
+  padding: 80px 40px 40px;
+  scroll-snap-align: start;
+  position: relative;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  max-width: var(--section-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.section-icon {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(0, 255, 65, 0.08);
+  border: 1px solid var(--matrix-border);
+}
+
+.section-title {
+  font-size: 1.6rem;
+  font-weight: 300;
+  color: var(--matrix-green);
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--matrix-border), transparent);
+}
+
+.section-content {
+  max-width: var(--section-max-width);
+  margin: 0 auto;
+  background: var(--matrix-panel);
+  border: 1px solid var(--matrix-border);
+  border-radius: 12px;
+  padding: 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(0, 255, 65, 0.02);
+}
+
+/* ── Cloudscape dark overrides ─────────────────────────────────────────────── */
+
+.section-content [class*="awsui"] {
+  --color-background-layout-main: transparent !important;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+.immersive-footer {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--matrix-text-dim);
+  font-size: 0.8rem;
+}
+
+.footer-helix {
+  font-size: 2rem;
+  margin-bottom: 12px;
+  animation: spin-slow 10s linear infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .immersive-nav {
+    right: 8px;
+  }
+
+  .nav-dot-label {
+    display: none;
+  }
+
+  .immersive-section {
+    padding: 60px 16px 16px;
+  }
+
+  .section-content {
+    padding: 12px;
+  }
+
+  .hero-title {
+    font-size: 3rem;
+  }
+}
