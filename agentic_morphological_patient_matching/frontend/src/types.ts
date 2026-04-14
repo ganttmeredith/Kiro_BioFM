@@ -137,3 +137,97 @@ export interface ChatRequest {
   messages: ChatMessage[]
   appContext: AppContext
 }
+
+// ── Outcome ──────────────────────────────────────────────────────────────
+
+export interface OutcomeCriteria {
+  deceased: boolean
+  tumorCausedDeath: boolean
+  recurrence: boolean
+  progression: boolean
+  metastasis: boolean
+}
+
+export interface CohortSummary {
+  count: number
+  meanAge?: number
+  sexDistribution: Record<string, number>
+}
+
+export interface ClassifyRequest {
+  criteria: OutcomeCriteria
+}
+
+export interface ClassifyResponse {
+  nonResponder: CohortSummary
+  responder: CohortSummary
+  nonResponderIds: string[]
+  responderIds: string[]
+  excludedCount: number
+}
+
+export interface AnalyteComparison {
+  analyteName: string
+  loincCode: string
+  group: string
+  nonResponderMean: number
+  nonResponderStd: number
+  responderMean: number
+  responderStd: number
+  pValue: number
+  adjustedPValue: number
+  effectSize: number
+  significant: boolean
+}
+
+export interface DeviationCell {
+  patientId: string
+  analyteName: string
+  deviationScore: number | null
+  cohort: string
+}
+
+export interface BiomarkerRequest {
+  criteria: OutcomeCriteria
+}
+
+export interface BiomarkerResponse {
+  comparisons: AnalyteComparison[]
+  deviationScores: DeviationCell[]
+}
+
+export interface BoxPlotRequest {
+  criteria: OutcomeCriteria
+  analyteName: string
+}
+
+export interface BoxPlotResponse {
+  plotlyJson: string
+  hasReferenceRange: boolean
+}
+
+export interface OutcomeUMAPRequest {
+  criteria: OutcomeCriteria
+  modality: 'imaging' | 'clinical' | 'multimodal'
+  nNeighbors: number
+  minDist: number
+  colorBy: string
+}
+
+export interface OutcomeUMAPResponse {
+  plotlyJson: string
+  nPoints: number
+  silhouetteScore: number
+}
+
+// ── Interpretation ───────────────────────────────────────────────────────
+
+export interface InterpretRequest {
+  contextType: 'biomarker_stats' | 'umap_clusters'
+  contextData: Record<string, unknown>
+}
+
+export interface InterpretResponse {
+  interpretation: string
+  contextType: string
+}

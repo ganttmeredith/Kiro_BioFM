@@ -43,7 +43,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from backend.routers import chat, cluster, data, patients, profiles, retrieval, status, umap
+from backend.routers import chat, cluster, data, outcome, patients, profiles, retrieval, status, umap
 from backend.services.composition_service import composition_service
 from backend.services.data_service import data_service
 
@@ -108,3 +108,4 @@ app.include_router(retrieval.router, prefix="/api/retrieval", tags=["retrieval"]
 app.include_router(profiles.router, prefix="/api/profiles", tags=["profiles"])
 app.include_router(patients.router, prefix="/api", tags=["patients"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(outcome.router, prefix="/api/outcome", tags=["outcome"])

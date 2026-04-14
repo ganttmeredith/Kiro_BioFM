@@ -890,10 +890,253 @@ def _make_tools(app_context: AppContext, artifact_queue: queue.Queue):
 
         return json.dumps({"chart_type": chart_type, "n_patients": n, "title": chart_title})
 
+    # ------------------------------------------------------------------
+    # Biomarker discovery tools
+    # ------------------------------------------------------------------
+
+    @tool
+    def classify_cohorts(
+        deceased: bool = False,
+        tumor_caused_death: bool = False,
+        recurrence: bool = False,
+        progression: bool = False,
+        metastasis: bool = False,
+    ) -> str:
+        """Classify patients into Non_Responder / Responder cohorts based on
+        clinical outcome criteria.
+
+        Use this tool when the user asks about cohort classification, non-responders,
+        or patient outcomes — e.g. "show me non-responders who had recurrence or
+        metastasis", "how many patients died from their tumor?".
+
+        At least one criterion must be True. A patient is Non_Responder if at least
+        one selected criterion matches.
+
+        Args:
+            deceased: Include patients with survival_status = "deceased".
+            tumor_caused_death: Include patients with survival_status_with_cause = "deceased_due_to_tumor".
+            recurrence: Include patients with recurrence = "yes".
+            progression: Include patients with progress_1 or progress_2 = "yes".
+            metastasis: Include patients with metastasis_1_locations not null.
+
+        Returns:
+            JSON with Non_Responder count, Responder count, excluded count,
+            mean ages, and sex distributions for each cohort.
+        """
+        from backend.models import ClassifyRequest, OutcomeCriteria
+        from backend.services.outcome_service import outcome_service
+
+        criteria = OutcomeCriteria(
+            deceased=deceased,
+            tumor_caused_death=tumor_caused_death,
+            recurrence=recurrence,
+            progression=progression,
+            metastasis=metastasis,
+        )
+        try:
+            result = outcome_service.classify(ClassifyRequest(criteria=criteria))
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+        return json.dumps(result.model_dump(by_alias=True))
+
+    @tool
+    def query_biomarkers(
+        deceased: bool = False,
+        tumor_caused_death: bool = False,
+        recurrence: bool = False,
+        progression: bool = False,
+        metastasis: bool = False,
+    ) -> str:
+        """Query biomarker analysis results between Non_Responder and Responder cohorts.
+
+        Use this tool when the user asks about biomarker differences, significant
+        analytes, or blood test comparisons — e.g. "which biomarkers are significantly
+        different?", "compare blood values between responders and non-responders".
+
+        At least one criterion must be True.
+
+        Args:
+            deceased: Include patients with survival_status = "deceased".
+            tumor_caused_death: Include patients with survival_status_with_cause = "deceased_due_to_tumor".
+            recurrence: Include patients with recurrence = "yes".
+            progression: Include patients with progress_1 or progress_2 = "yes".
+            metastasis: Include patients with metastasis_1_locations not null.
+
+        Returns:
+            JSON with significant analyte count, total analytes tested, and a list
+            of significant analytes sorted by adjusted p-value with effect sizes.
+        """
+        from backend.models import BiomarkerRequest, OutcomeCriteria
+        from backend.services.outcome_service import outcome_service
+
+        criteria = OutcomeCriteria(
+            deceased=deceased,
+            tumor_caused_death=tumor_caused_death,
+            recurrence=recurrence,
+            progression=progression,
+            metastasis=metastasis,
+        )
+        try:
+            result = outcome_service.analyze_biomarkers(BiomarkerRequest(criteria=criteria))
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
+        significant = [c for c in result.comparisons if c.significant]
+        summary = [
+            c.model_dump(by_alias=True)
+            for c in sorted(significant, key=lambda x: x.adjusted_p_value)
+        ]
+        return json.dumps({
+            "significant_count": len(significant),
+            "total_analytes": len(result.comparisons),
+            "significant_analytes": summary,
+        })
+
+    @tool
+    def generate_biomarker_chart(
+        chart_type: str = "boxplot",
+        analyte_name: str = "",
+        deceased: bool = False,
+        tumor_caused_death: bool = False,
+        recurrence: bool = False,
+        progression: bool = False,
+        metastasis: bool = False,
+    ) -> str:
+        """Generate a biomarker visualization and emit it as an inline chart artifact.
+
+        Use this tool when the user asks for a biomarker chart, box plot, heatmap,
+        or deviation plot — e.g. "show me a box plot of Hemoglobin", "generate a
+        heatmap of deviation scores".
+
+        At least one criterion must be True.
+
+        Args:
+            chart_type: One of "boxplot", "heatmap", or "deviation".
+                - boxplot: Box plot of a single analyte comparing cohorts (requires analyte_name).
+                - heatmap: Heatmap of deviation scores (rows=analytes, columns=patients grouped by cohort).
+                - deviation: Same as heatmap (alias).
+            analyte_name: Required for boxplot chart_type. The analyte to visualize.
+            deceased: Include patients with survival_status = "deceased".
+            tumor_caused_death: Include patients with survival_status_with_cause = "deceased_due_to_tumor".
+            recurrence: Include patients with recurrence = "yes".
+            progression: Include patients with progress_1 or progress_2 = "yes".
+            metastasis: Include patients with metastasis_1_locations not null.
+
+        Returns:
+            JSON with chart_type and analyte name. The Plotly figure is emitted as
+            an inline artifact — do NOT reproduce the chart as text or markdown.
+        """
+        from backend.models import BiomarkerRequest, BoxPlotRequest, OutcomeCriteria
+        from backend.services.outcome_service import outcome_service
+
+        criteria = OutcomeCriteria(
+            deceased=deceased,
+            tumor_caused_death=tumor_caused_death,
+            recurrence=recurrence,
+            progression=progression,
+            metastasis=metastasis,
+        )
+
+        try:
+            if chart_type == "boxplot":
+                if not analyte_name:
+                    return json.dumps({"error": "analyte_name is required for boxplot chart_type."})
+                result = outcome_service.generate_box_plot(
+                    BoxPlotRequest(criteria=criteria, analyte_name=analyte_name)
+                )
+                title = f"{analyte_name} — Non_Responder vs Responder"
+                artifact_queue.put(
+                    f"data: {json.dumps({'artifact': {'type': 'plotly', 'plotlyJson': result.plotly_json, 'title': title}})}\n\n"
+                )
+                return json.dumps({
+                    "chart_type": "boxplot",
+                    "analyte": analyte_name,
+                    "has_reference_range": result.has_reference_range,
+                })
+
+            elif chart_type in ("heatmap", "deviation"):
+                import pandas as pd
+                import plotly.graph_objects as go
+                import plotly.io as pio
+
+                bio_result = outcome_service.analyze_biomarkers(
+                    BiomarkerRequest(criteria=criteria)
+                )
+                cells = bio_result.deviation_scores
+                if not cells:
+                    return json.dumps({"error": "No deviation scores available."})
+
+                # Build a DataFrame from deviation cells
+                rows = [
+                    {"patient_id": c.patient_id, "analyte_name": c.analyte_name,
+                     "deviation_score": c.deviation_score, "cohort": c.cohort}
+                    for c in cells if c.deviation_score is not None
+                ]
+                if not rows:
+                    return json.dumps({"error": "No valid deviation scores (all missing reference ranges)."})
+
+                df = pd.DataFrame(rows)
+                pivot = df.pivot_table(
+                    index="analyte_name", columns="patient_id",
+                    values="deviation_score", aggfunc="mean",
+                )
+
+                # Sort columns: non_responder patients first, then responder
+                cohort_map = {c.patient_id: c.cohort for c in cells}
+                nr_cols = sorted([c for c in pivot.columns if cohort_map.get(c) == "non_responder"])
+                r_cols = sorted([c for c in pivot.columns if cohort_map.get(c) == "responder"])
+                ordered_cols = nr_cols + r_cols
+                pivot = pivot.reindex(columns=ordered_cols)
+
+                fig = go.Figure(data=go.Heatmap(
+                    z=pivot.values,
+                    x=[f"P{c}" for c in pivot.columns],
+                    y=list(pivot.index),
+                    colorscale="RdBu_r",
+                    zmid=0,
+                    text=pivot.values.round(2),
+                    texttemplate="%{text}",
+                    textfont=dict(size=8),
+                    hoverongaps=False,
+                    colorbar=dict(title="Deviation", thickness=12),
+                ))
+                # Add a vertical line separating cohorts
+                fig.add_vline(
+                    x=len(nr_cols) - 0.5,
+                    line_dash="dash", line_color="black", line_width=1,
+                )
+                fig.update_layout(
+                    title="Deviation Score Heatmap — Non_Responder | Responder",
+                    xaxis_title="Patients",
+                    yaxis_title="Analytes",
+                    height=max(400, len(pivot.index) * 25),
+                    template="plotly_white",
+                )
+                plotly_json = pio.to_json(fig)
+                title = "Deviation Score Heatmap"
+                artifact_queue.put(
+                    f"data: {json.dumps({'artifact': {'type': 'plotly', 'plotlyJson': plotly_json, 'title': title}})}\n\n"
+                )
+                return json.dumps({
+                    "chart_type": chart_type,
+                    "n_analytes": len(pivot.index),
+                    "n_patients": len(pivot.columns),
+                })
+
+            else:
+                return json.dumps({
+                    "error": f"Unknown chart_type '{chart_type}'. Valid: boxplot, heatmap, deviation."
+                })
+
+        except Exception as exc:
+            return json.dumps({"error": str(exc)})
+
     return [
         search_patients, get_dataset_info, run_retrieval,
         recompute_slide_embeddings, run_umap, run_clustering,
         validate_composition_profiles, plot_cohort_analysis,
+        classify_cohorts, query_biomarkers, generate_biomarker_chart,
     ]
 
 

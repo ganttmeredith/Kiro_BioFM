@@ -9,6 +9,16 @@ import type {
   RetrievalRequest,
   RetrievalResponse,
   ChatRequest,
+  ClassifyRequest,
+  ClassifyResponse,
+  BiomarkerRequest,
+  BiomarkerResponse,
+  OutcomeUMAPRequest,
+  OutcomeUMAPResponse,
+  BoxPlotRequest,
+  BoxPlotResponse,
+  InterpretRequest,
+  InterpretResponse,
 } from '../types'
 
 // ─── Base helpers ─────────────────────────────────────────────────────────────
@@ -144,4 +154,45 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
       if (parsed.delta !== undefined) yield parsed.delta
     }
   }
+}
+
+// ─── Outcome endpoints ───────────────────────────────────────────────────────
+
+/** POST /api/outcome/classify */
+export function classifyCohorts(req: ClassifyRequest): Promise<ClassifyResponse> {
+  return post<ClassifyRequest, ClassifyResponse>('/api/outcome/classify', req)
+}
+
+/** POST /api/outcome/biomarkers */
+export function analyzeBiomarkers(req: BiomarkerRequest): Promise<BiomarkerResponse> {
+  return post<BiomarkerRequest, BiomarkerResponse>('/api/outcome/biomarkers', req)
+}
+
+/** POST /api/outcome/umap */
+export function runOutcomeUMAP(req: OutcomeUMAPRequest): Promise<OutcomeUMAPResponse> {
+  return post<OutcomeUMAPRequest, OutcomeUMAPResponse>('/api/outcome/umap', req)
+}
+
+/** POST /api/outcome/export — returns CSV as Blob */
+export async function exportBiomarkerCSV(req: BiomarkerRequest): Promise<Blob> {
+  const res = await fetch('/api/outcome/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new ApiError(res.status, detail?.detail ?? res.statusText)
+  }
+  return res.blob()
+}
+
+/** POST /api/outcome/boxplot */
+export function generateBoxPlot(req: BoxPlotRequest): Promise<BoxPlotResponse> {
+  return post<BoxPlotRequest, BoxPlotResponse>('/api/outcome/boxplot', req)
+}
+
+/** POST /api/outcome/interpret */
+export function interpretResults(req: InterpretRequest): Promise<InterpretResponse> {
+  return post<InterpretRequest, InterpretResponse>('/api/outcome/interpret', req)
 }

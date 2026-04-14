@@ -15,6 +15,7 @@ import RetrievalPanel from './panels/RetrievalPanel'
 import UMAPPanel from './panels/UMAPPanel'
 import ClusterPanel from './panels/ClusterPanel'
 import ChatPanel from './panels/ChatPanel'
+import BiomarkerPanel from './panels/BiomarkerPanel'
 import FilterPanel from './components/FilterPanel'
 
 const loadingFallback = (
@@ -47,9 +48,10 @@ const NAV_ITEMS = [
   { text: 'Morphology Groups', href: '/cluster' },
   { text: 'Patient Matcher', href: '/retrieve' },
   { text: 'Chat', href: '/chat' },
+  { text: 'Biomarker Discovery', href: '/biomarkers' },
 ]
 
-const DATA_ONLY_PATHS = new Set(['/explore', '/cluster', '/retrieve', '/chat'])
+const DATA_ONLY_PATHS = new Set(['/explore', '/cluster', '/retrieve', '/chat', '/biomarkers'])
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -403,6 +405,16 @@ export default function App(): React.ReactElement {
                 setQueryPatientId(result.queryPatient.patientId)
               }}
             />
+          ) : (
+            <Navigate to="/data" replace />
+          )
+        }
+      />
+      <Route
+        path="/biomarkers"
+        element={
+          !statusResolved && dataSummary === null ? loadingFallback : dataLoaded ? (
+            <BiomarkerPanel onNotLoadedError={handleNotLoadedError} />
           ) : (
             <Navigate to="/data" replace />
           )

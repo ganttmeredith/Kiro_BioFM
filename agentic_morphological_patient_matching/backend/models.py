@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, model_validator
 from pydantic.alias_generators import to_camel
 
@@ -169,3 +169,104 @@ class AppContext(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     app_context: AppContext
+
+
+# ---------------------------------------------------------------------------
+# Outcome – cohort classification & biomarker discovery
+# ---------------------------------------------------------------------------
+
+
+class OutcomeCriteria(_CamelModel):
+    deceased: bool = False
+    tumor_caused_death: bool = False
+    recurrence: bool = False
+    progression: bool = False
+    metastasis: bool = False
+
+
+class ClassifyRequest(_CamelModel):
+    criteria: OutcomeCriteria
+
+
+class CohortSummary(_CamelModel):
+    count: int
+    mean_age: Optional[float] = None
+    sex_distribution: Dict[str, int] = {}
+
+
+class ClassifyResponse(_CamelModel):
+    non_responder: CohortSummary
+    responder: CohortSummary
+    non_responder_ids: List[str]
+    responder_ids: List[str]
+    excluded_count: int
+
+
+class BiomarkerRequest(_CamelModel):
+    criteria: OutcomeCriteria
+
+
+class AnalyteComparison(_CamelModel):
+    analyte_name: str
+    loinc_code: str
+    group: str
+    non_responder_mean: float
+    non_responder_std: float
+    responder_mean: float
+    responder_std: float
+    p_value: float
+    adjusted_p_value: float
+    effect_size: float
+    significant: bool
+
+
+class DeviationCell(_CamelModel):
+    patient_id: str
+    analyte_name: str
+    deviation_score: Optional[float] = None
+    cohort: str
+
+
+class BiomarkerResponse(_CamelModel):
+    comparisons: List[AnalyteComparison]
+    deviation_scores: List[DeviationCell]
+    box_plot_json: Optional[str] = None
+
+
+class BoxPlotRequest(_CamelModel):
+    criteria: OutcomeCriteria
+    analyte_name: str
+
+
+class BoxPlotResponse(_CamelModel):
+    plotly_json: str
+    has_reference_range: bool
+
+
+class OutcomeUMAPRequest(_CamelModel):
+    criteria: OutcomeCriteria
+    modality: Literal["imaging", "clinical", "multimodal"] = "imaging"
+    n_neighbors: int = 15
+    min_dist: float = 0.1
+    color_by: str = "cohort"
+
+
+class OutcomeUMAPResponse(_CamelModel):
+    plotly_json: str
+    n_points: int
+    silhouette_score: float
+
+
+# ---------------------------------------------------------------------------
+# Interpretation (Bedrock AI)
+# ---------------------------------------------------------------------------
+
+
+class InterpretRequest(_CamelModel):
+    context_type: Literal["biomarker_stats", "umap_clusters"]
+    context_data: Dict[str, Any]
+
+
+class InterpretResponse(_CamelModel):
+    interpretation: str
+    context_type: str
